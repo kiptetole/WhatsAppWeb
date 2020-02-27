@@ -1,0 +1,166 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { 
+        font: 13px Helvetica, Arial;
+        display: flex;
+        flex-flow: wrap;
+        margin: 0;
+      }
+      #cont-usuarios{
+        display: flex;
+        flex-flow: column;
+        width: 30vw;
+        border: solid black 1px;
+        overflow:hidden;
+        overflow-y:scroll;
+      }
+      #usuarios{
+        list-style: none;
+      }
+      #cont-usuarios h3{
+        text-align: center;
+        background-color: chartreuse;
+      }
+      #escribiendo {
+        background: rgb(182, 255, 194);
+        width: 100vw;
+      }
+      form {
+        background: rgb(4, 133, 26); 
+        padding: 3px; position: fixed; 
+        bottom: 0; 
+        width: 100%; 
+      }
+      form input { 
+        border: 0; 
+        padding: 10px;
+        width: 90%;
+        margin-right: .5%; 
+      }
+      form button { 
+        width: 9%; 
+        background: rgb(151, 255, 130); 
+        border: none; 
+        padding: 10px; }
+      #messages { 
+        list-style-type: none; 
+        margin: 0; 
+        padding: 0; 
+        width: 70vw;
+        height: 85vh;
+        border: solid black 1px;
+        overflow:hidden;
+        overflow-y:scroll;
+      }
+      #messages li { 
+        padding: 5px 10px; 
+      }
+      #messages li:nth-child(odd) { 
+        background: #eee; 
+      }
+      .ajeno{
+        text-align: right;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="cont-usuarios">
+      <h3>Usuarios Conectados</h3>
+      <ul id="usuarios">
+      </ul>
+    </div>
+    <ul id="messages"></ul>
+    <div id="escribiendo"></div>
+    <form action="">
+      <input id="m" autocomplete="off" />
+      <input type="file" id="siofu_input" />
+      <button>Send</button>
+    </form>
+  </body>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+  <script src="/siofu/client.js"></script>
+  <script>
+  $(function () {
+
+    var socket = io();
+    var nickname = prompt("Introduce tu nombre para ser identificado en el chat:");
+    socket.emit('usuario', nickname);
+    var uploader = new SocketIOFileUpload(socket);
+    uploader.listenOnInput(document.getElementById("siofu_input"));
+
+    $('form').submit(function(e){
+      e.preventDefault(); // prevents page reloading
+      if ($('#m').val() != ''){
+        socket.emit('chat message', $('#m').val());
+      }
+      socket.emit('no escribiendo', nickname);
+      $('#m').val('');
+      return false;
+    });
+    
+    var timeout=null;
+    $('form').keypress(function() {
+      socket.emit('escribiendo', nickname);
+      if (timeout)
+        clearTimeout(timeout);
+
+      timeout=setTimeout(()=>{
+        socket.emit('no escribiendo', nickname);
+      },2000)
+    });
+
+    socket.on('esta escribiendo', function(usuario){
+      if (usuario == nickname){
+        $('#escribiendo').text("estas escribiendo.");
+      }else{
+        $('#escribiendo').text(usuario + " esta escribiendo.");
+      }
+    });
+
+    socket.on('sin escribir', function(nickname){
+      $('#escribiendo').text("");
+    });
+    
+    socket.on('conectado', function(usuario){
+
+          if (usuario == nickname){
+        $('#messages').append($("<li>te has conectado</li>"));  
+      }else{
+      $('#messages').append($("<li>"+usuario+" se ha conectado al chat.</li>"));
+      }
+    });
+    
+    socket.on('listado usuarios', function(usarios){
+      $('#usuarios').empty();
+      for(let usuario of usarios){
+        $('#usuarios').append($("<li>"+nickname+"</li>"));
+      }
+    });
+
+    socket.on('desconectado', function(nickname){
+      $('#messages').append($("<li>"+nickname+" se ha desconectado del chat.</li>"));
+
+    });
+
+    socket.on('chat message', function(massage){
+      if (massage.nickname == nickname){
+        $('#messages').append($("<li class=\"ajeno\">"+massage.msg+"</li>"));
+      }else{
+        $('#messages').append($("<li>"+massage.nickname+": "+massage.msg+"</li>"));
+      }
+    });
+
+    socket.on('archivoEnviado', function(e){
+      console.log(e)
+      $('#messages').append($("<li>"+nickname+": "+e.file.pathName+"</li>"));
+    })
+
+  });
+</script>
+ 
+</html>
